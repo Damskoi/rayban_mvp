@@ -1,22 +1,15 @@
 workflows:
   ios-build:
-    name: iOS MVP Build (Unsigned)
+    name: iOS MVP Build
     instance_type: mac_mini_m2
     environment:
-      flutter: 3.29.0
+      flutter: stable
       xcode: latest
       cocoapods: default
     scripts:
       - name: Get Flutter Packages
         script: |
           flutter packages pub get
-
-      - name: Install Pods
-        script: |
-          cd ios
-          pod install
-          cd ..
-
       - name: Build iOS IPA (Unsigned)
         script: |
           set -e
@@ -24,30 +17,25 @@ workflows:
           # 1. Empêcher Flutter de supprimer CocoaPods
           flutter config --no-enable-swift-package-manager
           
-          # 2. Forcer la mise à jour des Pods au cas où
-          cd ios
-          pod install --repo-update
-          cd ..
-          
-          # 3. Compiler une archive Xcode (Bypass parfait des certificats)
+          # 2. Compiler une archive Xcode (Gère CocoaPods et Bypass les certificats)
           flutter build ipa --release --no-codesign
           
-          # 4. Récupérer l'application depuis l'archive
+          # 3. Récupérer l'application depuis l'archive
           APP_PATH="build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app"
           if [ ! -d "$APP_PATH" ]; then
             echo "Erreur: Le build n'a pas produit de Runner.app"
             exit 1
           fi
           
-          # 5. Packager l'IPA
+          # 4. Packager l'IPA
           rm -rf Payload
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
           zip -qr rayban_mvp_unsigned.ipa Payload
           
           # Déplacement du fichier IPA à la racine du projet
-          mv rayban_mvp_unsigned.ipa $CM_BUILD_DIR/
-
+          mv rayban_mvp_unsigned.ipa build/ios/iphoneos/rayban_mvp_unsigned.ipa || true
+          
           echo "IPA non signé créé avec succès pour Sideloadly !"
     artifacts:
       - "*.ipa"
