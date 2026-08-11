@@ -20,17 +20,21 @@ import MWDATCamera
       print("Failed to configure Wearables SDK: \(error)")
     }
 
-    let controller : FlutterViewController = window?.rootViewController as! FlutterViewController
+    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
+    GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     
     // 2. Création du Method Channel pour les commandes
     let cameraChannel = FlutterMethodChannel(name: "com.rayban.meta/camera",
-                                              binaryMessenger: controller.binaryMessenger)
+                                              binaryMessenger: engineBridge.binaryMessenger)
     cameraChannel.setMethodCallHandler({
-      (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
+      [weak self] (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
       if call.method == "startStream" {
-        self.startStream(result: result)
+        self?.startStream(result: result)
       } else if call.method == "takePhoto" {
-        self.takePhoto(result: result)
+        self?.takePhoto(result: result)
       } else {
         result(FlutterMethodNotImplemented)
       }
@@ -38,14 +42,8 @@ import MWDATCamera
 
     // 3. Création du Event Channel pour le flux vidéo (images binaires)
     let videoChannel = FlutterEventChannel(name: "com.rayban.meta/video",
-                                           binaryMessenger: controller.binaryMessenger)
+                                           binaryMessenger: engineBridge.binaryMessenger)
     videoChannel.setStreamHandler(VideoEventHandler(appDelegate: self))
-
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
-  }
-
-  func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
-    GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
   }
 
   private func startStream(result: @escaping FlutterResult) {
