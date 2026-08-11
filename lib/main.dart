@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -31,14 +32,29 @@ class RayBanMVPPage extends StatefulWidget {
 }
 
 class _RayBanMVPPageState extends State<RayBanMVPPage> {
-  // Canal de communication avec le code natif (iOS / SDK Meta)
   static const platform = MethodChannel('com.rayban.meta/camera');
+  static const videoChannel = EventChannel('com.rayban.meta/video');
   
   bool _isStreaming = false;
+  Uint8List? _latestFrame;
+
+  @override
+  void initState() {
+    super.initState();
+    // Écoute du flux vidéo venant d'iOS
+    videoChannel.receiveBroadcastStream().listen((event) {
+      if (event is Uint8List) {
+        setState(() {
+          _latestFrame = event;
+        });
+      }
+    }, onError: (error) {
+      print("Erreur du flux vidéo: $error");
+    });
+  }
 
   Future<void> _startStream() async {
     try {
-      // Appel de la méthode native "startStream" qui devra être implémentée dans iOS
       final bool result = await platform.invokeMethod('startStream');
       setState(() {
         _isStreaming = result;
@@ -47,26 +63,24 @@ class _RayBanMVPPageState extends State<RayBanMVPPage> {
         SnackBar(content: Text(result ? 'Flux démarré' : 'Échec du flux')),
       );
     } on PlatformException catch (e) {
-      // En l'absence d'implémentation native pour l'instant (sur Windows), cela échouera
       setState(() {
-        _isStreaming = true; // On simule le succès pour l'interface UI MVP
+        _isStreaming = true; // Simulé pour l'UI sur simulateur
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Simulation : Flux démarré (Erreur native: ${e.message})")),
+        SnackBar(content: Text("Erreur native: ${e.message}")),
       );
     }
   }
 
   Future<void> _takePhoto() async {
     try {
-      // Appel de la méthode native "takePhoto"
       await platform.invokeMethod('takePhoto');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Photo prise !')),
+        const SnackBar(content: Text('Photo prise avec succès !')),
       );
     } on PlatformException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Simulation : Photo prise (Erreur native: ${e.message})")),
+        SnackBar(content: Text("Erreur photo native: ${e.message}")),
       );
     }
   }
@@ -89,31 +103,35 @@ class _RayBanMVPPageState extends State<RayBanMVPPage> {
               decoration: BoxDecoration(
                 color: Colors.black87,
                 borderRadius: BorderRadius.circular(20),
-                boxShadow: [
+                boxShadow: const [
                   BoxShadow(
                     color: Colors.black26,
                     blurRadius: 10,
-                    offset: const Offset(0, 5),
+                    offset: Offset(0, 5),
                   )
                 ]
               ),
-              child: _isStreaming 
-                  ? const Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.videocam, color: Colors.greenAccent, size: 50),
-                        SizedBox(height: 10),
-                        Text("🎥 Flux vidéo actif", style: TextStyle(color: Colors.white, fontSize: 16)),
-                      ],
-                    )
-                  : const Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.videocam_off, color: Colors.white54, size: 50),
-                        SizedBox(height: 10),
-                        Text("Flux vidéo inactif", style: TextStyle(color: Colors.white54, fontSize: 16)),
-                      ],
-                    ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: _isStreaming 
+                    ? (_latestFrame != null
+                        ? Image.memory(
+                            _latestFrame!,
+                            fit: BoxFit.cover,
+                            gaplessPlayback: true,
+                          )
+                        : const Center(
+                            child: CircularProgressIndicator(color: Colors.white),
+                          ))
+                    : const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.videocam_off, color: Colors.white54, size: 50),
+                          SizedBox(height: 10),
+                          Text("Flux vidéo inactif", style: TextStyle(color: Colors.white54, fontSize: 16)),
+                        ],
+                      ),
+              ),
             ),
             const SizedBox(height: 50),
             ElevatedButton.icon(

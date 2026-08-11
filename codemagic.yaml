@@ -3,7 +3,7 @@ workflows:
     name: iOS MVP Build
     instance_type: mac_mini_m2
     environment:
-      flutter: default
+      flutter: 3.44.9
       xcode: latest
       cocoapods: default
     scripts:
