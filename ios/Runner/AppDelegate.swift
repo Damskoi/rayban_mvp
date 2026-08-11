@@ -6,7 +6,7 @@ import MWDATCamera
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private var session: DeviceSession?
-  private var stream: Stream?
+  private var stream: MWDATCore.Stream?
   private var frameSink: FlutterEventSink?
 
   override func application(
