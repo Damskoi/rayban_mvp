@@ -26,7 +26,7 @@ import MWDATCamera
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     
-    let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "RayBanMVP")
+    guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "RayBanMVP") else { return }
     let messenger = registrar.messenger()
     
     // 2. Création du Method Channel pour les commandes
