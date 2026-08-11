@@ -12,13 +12,26 @@ workflows:
           flutter packages pub get
       - name: Build iOS IPA (Unsigned)
         script: |
-          # Compilation de l'application sans signature (crée un .app)
+          # 1. Force l'installation des dépendances natives (Meta SDK)
+          cd ios
+          pod install --repo-update
+          cd ..
+          
+          # 2. Compilation de l'application sans signature
           flutter build ios --release --no-codesign
           
-          # Création manuelle du fichier .ipa pour Sideloadly
-          cd build/ios/iphoneos
+          # 3. Recherche automatique du dossier .app généré
+          APP_PATH=$(find build/ios -name "Runner.app" | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "Erreur: Runner.app introuvable !"
+            exit 1
+          fi
+          
+          # 4. Création manuelle de l'IPA à la racine du projet
+          echo "Application trouvée : $APP_PATH"
           mkdir -p Payload
-          cp -r Runner.app Payload/
+          cp -r "$APP_PATH" Payload/
           zip -qr rayban_mvp_unsigned.ipa Payload
+          echo "IPA généré avec succès !"
     artifacts:
-      - build/ios/iphoneos/*.ipa
+      - "*.ipa"
