@@ -114,45 +114,6 @@ import MWDATCamera
         if self.session == nil || self.session?.state == .stopping || self.session?.state == .stopped {
             self.session = try wearables.createSession(deviceSelector: deviceSelector)
         }
-        
-        try self.session?.start()
-
-        var finalState: MWDATCore.DeviceSessionState? = self.session?.state
-        if finalState != .started {
-            let waitResult = await withTaskGroup(of: String.self) { group in
-                group.addTask {
-                    guard let stream = self.session?.stateStream() else { return "NoStateStream" }
-                    for await state in stream {
-                        if state == .started { return "OK" }
-                        if state == .idle { return "IDLE" }
-                        if state == .stopping { return "STOPPING" }
-                    }
-                    return "EndStream"
-                }
-                
-                group.addTask {
-                    guard let errStream = self.session?.errorStream() else { return "NoErrorStream" }
-                    for await err in errStream {
-                        return "ERROR: \(err)"
-                    }
-                    return "EndErrStream"
-                }
-                
-                group.addTask {
-                    try? await Task.sleep(nanoseconds: 10_000_000_000) // 10s timeout
-                    return "TIMEOUT"
-                }
-                
-                let firstResult = await group.next() ?? "TIMEOUT"
-                group.cancelAll()
-                return firstResult
-            }
-            
-            if waitResult != "OK" {
-                result(FlutterError(code: "SESSION_FAILED", message: "La session n'a pas pu démarrer. Raison: \(waitResult), État actuel: \(String(describing: self.session?.state))", details: nil))
-                return
-            }
-        }
 
         let config = MWDATCamera.StreamConfiguration(
           videoCodec: VideoCodec.raw,
@@ -226,19 +187,12 @@ class ConnectionEventHandler: NSObject, FlutterStreamHandler {
     private var task: Task<Void, Never>?
     
     func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+        let wearables = Wearables.shared
+        
         task = Task {
-            let wearables = Wearables.shared
-            if wearables.registrationState != .registered {
-                DispatchQueue.main.async { events(false) }
-                // Still monitor in case they register while listening
-            }
-            let deviceSelector = AutoDeviceSelector(wearables: wearables)
-            
-            for await device in deviceSelector.activeDeviceStream() {
-                if Task.isCancelled { break }
-                let isConnected = (device != nil)
+            for await devices in wearables.devicesStream() {
                 DispatchQueue.main.async {
-                    events(isConnected)
+                    events(!devices.isEmpty)
                 }
             }
         }
