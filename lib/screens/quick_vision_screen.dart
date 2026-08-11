@@ -15,11 +15,15 @@ class _QuickVisionScreenState extends State<QuickVisionScreen> {
   
   bool _isStreaming = false;
   bool _isLoading = false;
+  bool _isCheckingConnection = true;
+  bool _isConnected = false;
   Uint8List? _latestFrame;
 
   @override
   void initState() {
     super.initState();
+    _checkInitialConnection();
+    
     videoChannel.receiveBroadcastStream().listen((event) {
       if (event is Uint8List) {
         if (mounted) {
@@ -38,6 +42,25 @@ class _QuickVisionScreenState extends State<QuickVisionScreen> {
         });
       }
     });
+  }
+
+  Future<void> _checkInitialConnection() async {
+    try {
+      final bool result = await platform.invokeMethod('checkConnection');
+      if (mounted) {
+        setState(() {
+          _isConnected = result;
+          _isCheckingConnection = false;
+        });
+      }
+    } on PlatformException catch (_) {
+      if (mounted) {
+        setState(() {
+          _isConnected = false;
+          _isCheckingConnection = false;
+        });
+      }
+    }
   }
 
   Future<void> _startStream() async {
@@ -137,33 +160,37 @@ class _QuickVisionScreenState extends State<QuickVisionScreen> {
                           : const Center(
                               child: CircularProgressIndicator(color: Colors.white),
                             ))
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.portable_wifi_off_rounded,
-                              color: Color(0xFFFF8B26),
-                              size: 60,
-                            ),
-                            const SizedBox(height: 20),
-                            const Text(
-                              "Glasses Not Connected",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              "Glasses not connected. Please pair in Meta View first",
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.6),
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
+                      : (_isCheckingConnection
+                          ? const Center(child: CircularProgressIndicator(color: Colors.white54))
+                          : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  _isConnected ? Icons.check_circle_outline_rounded : Icons.portable_wifi_off_rounded,
+                                  color: _isConnected ? Colors.green : const Color(0xFFFF8B26),
+                                  size: 60,
+                                ),
+                                const SizedBox(height: 20),
+                                Text(
+                                  _isConnected ? "Glasses Ready" : "Glasses Not Connected",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  _isConnected 
+                                      ? "Ready to start Quick Vision." 
+                                      : "Glasses not connected. Please pair in Meta View first.",
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.6),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            )),
                   ),
                 ),
               ),
