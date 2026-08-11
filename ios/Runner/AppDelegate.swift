@@ -49,22 +49,42 @@ import MWDATCamera
     videoChannel.setStreamHandler(VideoEventHandler(appDelegate: self))
   }
 
+  override func application(
+    _ app: UIApplication,
+    open url: URL,
+    options: [UIApplication.OpenURLOptionsKey : Any] = [:]
+  ) -> Bool {
+    Task {
+      do {
+        _ = try await Wearables.shared.handleUrl(url)
+        print("Wearables handleUrl success for: \(url)")
+      } catch {
+        print("Wearables handleUrl error: \(error)")
+      }
+    }
+    return super.application(app, open: url, options: options)
+  }
+
   private func startStream(result: @escaping FlutterResult) {
     Task {
       do {
         let wearables = Wearables.shared
         
-        // Optionnel : Lancement de l'enregistrement si non enregistré
-        // try wearables.startRegistration()
+        // 1. Check registration state
+        if wearables.registrationState != .registered {
+           print("Not registered. Starting registration flow...")
+           try await wearables.startRegistration()
+        }
 
-        // 4. Demander la permission caméra des lunettes
+        // 2. Request camera permission
+        print("Requesting camera permission...")
         let status = try await wearables.requestPermission(.camera)
         if status != .granted {
            result(FlutterError(code: "PERMISSION_DENIED", message: "Permission caméra refusée", details: nil))
            return
         }
 
-        // 5. Créer la session et se connecter aux lunettes
+        // 3. Create session and connect
         let deviceSelector = AutoDeviceSelector(wearables: wearables)
         self.session = try wearables.createSession(deviceSelector: deviceSelector)
         try self.session?.start()
