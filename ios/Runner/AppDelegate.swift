@@ -77,15 +77,45 @@ import MWDATCamera
         }
 
         // 2. Request camera permission
-        print("Requesting camera permission...")
-        let status = try await wearables.requestPermission(.camera)
-        if status != .granted {
-           result(FlutterError(code: "PERMISSION_DENIED", message: "Permission caméra refusée", details: nil))
+        print("Checking camera permission...")
+        let currentStatus = try await wearables.checkPermissionStatus(.camera)
+        if currentStatus != .granted {
+            print("Requesting camera permission...")
+            let status = try await wearables.requestPermission(.camera)
+            if status != .granted {
+               result(FlutterError(code: "PERMISSION_DENIED", message: "Permission caméra refusée", details: nil))
+               return
+            }
+        }
+
+        // 3. Wait for device connection (Meta View app can take a few seconds to establish Bluetooth)
+        let deviceSelector = AutoDeviceSelector(wearables: wearables)
+        
+        print("Waiting for device to connect...")
+        let connected = await withTaskGroup(of: Bool.self) { group in
+            group.addTask {
+                for await device in deviceSelector.activeDeviceStream() {
+                    if device != nil {
+                        return true
+                    }
+                }
+                return false
+            }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: 10_000_000_000) // 10s timeout
+                return false
+            }
+            let res = await group.next() ?? false
+            group.cancelAll()
+            return res
+        }
+
+        if !connected {
+           result(FlutterError(code: "NO_DEVICE", message: "Timeout: Aucune lunette connectée", details: nil))
            return
         }
 
-        // 3. Create session and connect
-        let deviceSelector = AutoDeviceSelector(wearables: wearables)
+        // 4. Create session and connect
         self.session = try wearables.createSession(deviceSelector: deviceSelector)
         try self.session?.start()
 
