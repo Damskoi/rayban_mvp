@@ -12,7 +12,13 @@ workflows:
           flutter packages pub get
       - name: Build iOS IPA (Unsigned)
         script: |
-          # Compilation de l'application sans signature pour tester via Sideloadly
-          flutter build ipa --release --no-codesign
+          # Compilation de l'application sans signature (crée un .app)
+          flutter build ios --release --no-codesign
+          
+          # Création manuelle du fichier .ipa pour Sideloadly
+          cd build/ios/iphoneos
+          mkdir -p Payload
+          cp -r Runner.app Payload/
+          zip -qr rayban_mvp_unsigned.ipa Payload
     artifacts:
-      - build/ios/ipa/*.ipa
+      - build/ios/iphoneos/*.ipa
