@@ -1,58 +1,49 @@
 workflows:
   ios-build:
-    name: iOS MVP Build
+    name: iOS MVP Build (Unsigned)
     instance_type: mac_mini_m2
     environment:
-      flutter: stable
+      flutter: 3.29.0
       xcode: latest
       cocoapods: default
     scripts:
       - name: Get Flutter Packages
         script: |
           flutter packages pub get
+
+      - name: Install Pods
+        script: |
+          cd ios
+          pod install
+          cd ..
+
       - name: Build iOS IPA (Unsigned)
         script: |
           set -e
           
-          # 1. Préparer l'environnement Flutter sans compiler (via simulateur pour bypasser l'erreur de certificat Apple)
-          flutter build ios --simulator --config-only
+          # 1. Compilation native Flutter sans signature pour appareil physique
+          flutter build ios --release --no-codesign
           
-          # 2. Forcer CocoaPods (Flutter a la fâcheuse habitude de supprimer les Pods)
-          cd ios
-          pod install --repo-update
-          cd ..
-          
-          # 3. Compilation NATIVE avec xcodebuild (contourne les vérifications de Flutter)
-          xcodebuild build \
-            -workspace ios/Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -sdk iphoneos \
-            -arch arm64 \
-            SYMROOT="$(PWD)/build/ios" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            | grep -v "note:" # Filtre les avertissements inutiles
-          
-          # 4. Récupération du build natif
-          APP_PATH="build/ios/Release-iphoneos/Runner.app"
+          # 2. Vérification de la présence de Runner.app
+          APP_PATH="build/ios/iphoneos/Runner.app"
           if [ ! -d "$APP_PATH" ]; then
-            echo "Erreur: Xcode n'a pas produit le Runner.app"
+            echo "Erreur: Flutter n'a pas produit le fichier Runner.app"
             exit 1
           fi
-          
-          # Affichage de la taille pour vérification dans les logs
+
           echo "Taille de l'application générée :"
           du -sh "$APP_PATH"
-          
-          # 4. Création propre de l'IPA
+
+          # 3. Empaquetage du dossier Payload au format .IPA
+          cd build/ios/iphoneos
           rm -rf Payload
           mkdir -p Payload
-          cp -R "$APP_PATH" Payload/
+          cp -R Runner.app Payload/
           zip -qr rayban_mvp_unsigned.ipa Payload
           
-          echo "Taille de l'IPA final :"
-          ls -lh rayban_mvp_unsigned.ipa
+          # Déplacement du fichier IPA à la racine du projet
+          mv rayban_mvp_unsigned.ipa $CM_BUILD_DIR/
+
+          echo "IPA non signé créé avec succès pour Sideloadly !"
     artifacts:
-      - "rayban_mvp_unsigned.ipa"
+      - "*.ipa"
