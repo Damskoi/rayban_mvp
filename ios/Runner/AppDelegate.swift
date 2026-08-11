@@ -114,27 +114,39 @@ import MWDATCamera
         self.session = try wearables.createSession(deviceSelector: deviceSelector)
         try self.session?.start()
 
-        if self.session?.state != .started {
-            let sessionStarted = await withTaskGroup(of: Bool.self) { group in
+        var finalState: MWDATCore.DeviceSessionState? = self.session?.state
+        if finalState != .started {
+            let waitResult = await withTaskGroup(of: String.self) { group in
                 group.addTask {
-                    guard let stream = self.session?.stateStream() else { return false }
+                    guard let stream = self.session?.stateStream() else { return "NoStateStream" }
                     for await state in stream {
-                        if state == .started { return true }
-                        if state == .idle { return false }
+                        if state == .started { return "OK" }
+                        if state == .idle { return "IDLE" }
+                        if state == .stopping { return "STOPPING" }
                     }
-                    return false
+                    return "EndStream"
                 }
                 
                 group.addTask {
-                    try? await Task.sleep(nanoseconds: 15_000_000_000) // 15s timeout
-                    return false
+                    guard let errStream = self.session?.errorStream() else { return "NoErrorStream" }
+                    for await err in errStream {
+                        return "ERROR: \(err)"
+                    }
+                    return "EndErrStream"
                 }
                 
-                return await group.next() ?? false
+                group.addTask {
+                    try? await Task.sleep(nanoseconds: 10_000_000_000) // 10s timeout
+                    return "TIMEOUT"
+                }
+                
+                let firstResult = await group.next() ?? "TIMEOUT"
+                group.cancelAll()
+                return firstResult
             }
             
-            if !sessionStarted {
-                result(FlutterError(code: "SESSION_TIMEOUT", message: "La session n'a pas pu démarrer", details: nil))
+            if waitResult != "OK" {
+                result(FlutterError(code: "SESSION_FAILED", message: "La session n'a pas pu démarrer. Raison: \(waitResult), État actuel: \(String(describing: self.session?.state))", details: nil))
                 return
             }
         }
