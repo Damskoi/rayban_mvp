@@ -111,24 +111,13 @@ import MWDATCamera
            return
         }
 
-        Task {
-            do {
-                let currentStatus = try await wearables.checkPermissionStatus(.camera)
-                if currentStatus != .granted {
-                    let status = try await wearables.requestPermission(.camera)
-                    if status != .granted {
-                        result(FlutterError(code: "PERMISSION_DENIED", message: "Permission caméra refusée", details: nil))
-                        return
-                    }
-                }
+        if self.session == nil || self.session?.state == .stopping || self.session?.state == .stopped {
+            self.session = try wearables.createSession(deviceSelector: deviceSelector)
+        }
+        
+        try self.session?.start()
 
-                if self.session == nil || self.session?.state == .stopping || self.session?.state == .stopped {
-                    self.session = try wearables.createSession(deviceSelector: deviceSelector)
-                }
-                
-                try self.session?.start()
-
-                var finalState: MWDATCore.DeviceSessionState? = self.session?.state
+        var finalState: MWDATCore.DeviceSessionState? = self.session?.state
         if finalState != .started {
             let waitResult = await withTaskGroup(of: String.self) { group in
                 group.addTask {
