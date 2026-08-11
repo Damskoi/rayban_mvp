@@ -9,33 +9,28 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  static const platform = MethodChannel('com.rayban.meta/camera');
+  static const connectionChannel = EventChannel('com.rayban.meta/connection');
   bool _isConnected = false;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _checkConnection();
-  }
-
-  Future<void> _checkConnection() async {
-    try {
-      final bool result = await platform.invokeMethod('checkConnection');
-      if (mounted) {
+    connectionChannel.receiveBroadcastStream().listen((event) {
+      if (mounted && event is bool) {
         setState(() {
-          _isConnected = result;
+          _isConnected = event;
           _isLoading = false;
         });
       }
-    } on PlatformException catch (_) {
+    }, onError: (_) {
       if (mounted) {
         setState(() {
           _isConnected = false;
           _isLoading = false;
         });
       }
-    }
+    });
   }
 
   @override

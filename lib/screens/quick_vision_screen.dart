@@ -12,6 +12,7 @@ class QuickVisionScreen extends StatefulWidget {
 class _QuickVisionScreenState extends State<QuickVisionScreen> {
   static const platform = MethodChannel('com.rayban.meta/camera');
   static const videoChannel = EventChannel('com.rayban.meta/video');
+  static const connectionChannel = EventChannel('com.rayban.meta/connection');
   
   bool _isStreaming = false;
   bool _isLoading = false;
@@ -22,7 +23,22 @@ class _QuickVisionScreenState extends State<QuickVisionScreen> {
   @override
   void initState() {
     super.initState();
-    _checkInitialConnection();
+    
+    connectionChannel.receiveBroadcastStream().listen((event) {
+      if (mounted && event is bool) {
+        setState(() {
+          _isConnected = event;
+          _isCheckingConnection = false;
+        });
+      }
+    }, onError: (_) {
+      if (mounted) {
+        setState(() {
+          _isConnected = false;
+          _isCheckingConnection = false;
+        });
+      }
+    });
     
     videoChannel.receiveBroadcastStream().listen((event) {
       if (event is Uint8List) {
@@ -42,25 +58,6 @@ class _QuickVisionScreenState extends State<QuickVisionScreen> {
         });
       }
     });
-  }
-
-  Future<void> _checkInitialConnection() async {
-    try {
-      final bool result = await platform.invokeMethod('checkConnection');
-      if (mounted) {
-        setState(() {
-          _isConnected = result;
-          _isCheckingConnection = false;
-        });
-      }
-    } on PlatformException catch (_) {
-      if (mounted) {
-        setState(() {
-          _isConnected = false;
-          _isCheckingConnection = false;
-        });
-      }
-    }
   }
 
   Future<void> _startStream() async {
