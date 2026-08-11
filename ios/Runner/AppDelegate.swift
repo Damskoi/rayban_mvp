@@ -5,8 +5,8 @@ import MWDATCamera
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
-  private var session: DeviceSession?
-  private var stream: MWDATCamera.Stream?
+  private var streamSession: StreamSession?
+  private var videoListenerToken: AnyListenerToken?
   private var frameSink: FlutterEventSink?
 
   override func application(
@@ -88,7 +88,7 @@ import MWDATCamera
             }
         }
 
-        // 3. Wait for device connection (Meta View app can take a few seconds to establish Bluetooth)
+        // 3. Wait for device connection
         let deviceSelector = AutoDeviceSelector(wearables: wearables)
         
         print("Waiting for device to connect...")
@@ -115,32 +115,25 @@ import MWDATCamera
            return
         }
 
-        // 4. Create session and connect
-        self.session = try wearables.createSession(deviceSelector: deviceSelector)
-        try self.session?.start()
-
-        // 6. Configurer la résolution basse pour limiter la latence Bluetooth
-        let config = StreamConfiguration(
+        // 4. Create StreamSession
+        let config = StreamSessionConfig(
           videoCodec: VideoCodec.raw,
-          resolution: StreamingResolution.low,
+          resolution: .low,
           frameRate: 24)
 
-        if let camera = try self.session?.addCamera(config: config) {
-          self.stream = camera.stream
-          
-          // 7. Écouter les images et les envoyer vers Flutter via EventChannel
-          _ = self.stream?.videoFramePublisher.listen { frame in
+        self.streamSession = StreamSession(streamSessionConfig: config, deviceSelector: deviceSelector)
+        
+        // 5. Subscribe to video frames (IMPORTANT: retain the token!)
+        self.videoListenerToken = self.streamSession?.videoFramePublisher.listen { [weak self] frame in
              if let image = frame.makeUIImage(), let data = image.jpegData(compressionQuality: 0.5) {
                 DispatchQueue.main.async {
-                   self.frameSink?(data) // Envoi des bytes compressés à Flutter
+                   self?.frameSink?(data)
                 }
              }
-          }
-          self.stream?.start()
-          result(true)
-        } else {
-          result(false)
         }
+        
+        await self.streamSession?.start()
+        result(true)
       } catch {
         result(FlutterError(code: "STREAM_ERROR", message: error.localizedDescription, details: nil))
       }
@@ -148,9 +141,8 @@ import MWDATCamera
   }
 
   private func takePhoto(result: @escaping FlutterResult) {
-    if let stream = self.stream {
-       // 8. Capture photo via la caméra
-       stream.capturePhoto(format: .jpeg)
+    if let session = self.streamSession {
+       session.capturePhoto(format: .jpeg)
        result(true)
     } else {
        result(FlutterError(code: "NO_STREAM", message: "Le flux n'est pas démarré", details: nil))
