@@ -26,9 +26,12 @@ import MWDATCamera
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     
+    let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "RayBanMVP")
+    let messenger = registrar.messenger()
+    
     // 2. Création du Method Channel pour les commandes
     let cameraChannel = FlutterMethodChannel(name: "com.rayban.meta/camera",
-                                              binaryMessenger: engineBridge.binaryMessenger)
+                                              binaryMessenger: messenger)
     cameraChannel.setMethodCallHandler({
       [weak self] (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
       if call.method == "startStream" {
@@ -42,7 +45,7 @@ import MWDATCamera
 
     // 3. Création du Event Channel pour le flux vidéo (images binaires)
     let videoChannel = FlutterEventChannel(name: "com.rayban.meta/video",
-                                           binaryMessenger: engineBridge.binaryMessenger)
+                                           binaryMessenger: messenger)
     videoChannel.setStreamHandler(VideoEventHandler(appDelegate: self))
   }
 
