@@ -14,22 +14,31 @@ workflows:
         script: |
           set -e
           
-          # 1. Génère le fichier Generated.xcconfig sans compiler
+          # 1. Préparer l'environnement Flutter sans compiler
           flutter build ios --config-only
           
-          # 2. Nettoyage profond et réinstallation des Pods
+          # 2. Forcer CocoaPods (Flutter a la fâcheuse habitude de supprimer les Pods)
           cd ios
-          rm -rf Pods Podfile.lock Runner.xcworkspace
           pod install --repo-update
           cd ..
           
-          # 3. Compilation de l'application sans signature
-          flutter build ios --release --no-codesign
+          # 3. Compilation NATIVE avec xcodebuild (contourne les vérifications de Flutter)
+          xcodebuild build \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -arch arm64 \
+            SYMROOT="$(PWD)/build/ios" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            | grep -v "note:" # Filtre les avertissements inutiles
           
-          # 3. Récupération du build final officiel
-          APP_PATH="build/ios/iphoneos/Runner.app"
+          # 4. Récupération du build natif
+          APP_PATH="build/ios/Release-iphoneos/Runner.app"
           if [ ! -d "$APP_PATH" ]; then
-            echo "Erreur: Le build n'a pas produit de Runner.app dans $APP_PATH"
+            echo "Erreur: Xcode n'a pas produit le Runner.app"
             exit 1
           fi
           
