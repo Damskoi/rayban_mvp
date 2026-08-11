@@ -1,7 +1,42 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  static const platform = MethodChannel('com.rayban.meta/camera');
+  bool _isConnected = false;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkConnection();
+  }
+
+  Future<void> _checkConnection() async {
+    try {
+      final bool result = await platform.invokeMethod('checkConnection');
+      if (mounted) {
+        setState(() {
+          _isConnected = result;
+          _isLoading = false;
+        });
+      }
+    } on PlatformException catch (_) {
+      if (mounted) {
+        setState(() {
+          _isConnected = false;
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,8 +77,8 @@ class SettingsScreen extends StatelessWidget {
                   children: [
                     Container(
                       padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF3855A5),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF3855A5),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.remove_red_eye, color: Colors.white, size: 20),
@@ -61,24 +96,31 @@ class SettingsScreen extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 2),
-                        Text(
-                          "Not Connected",
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.5),
-                            fontSize: 12,
-                          ),
-                        ),
+                        _isLoading
+                            ? SizedBox(
+                                height: 12,
+                                width: 12,
+                                child: const CircularProgressIndicator(color: Colors.white54, strokeWidth: 2),
+                              )
+                            : Text(
+                                _isConnected ? "Connected" : "Not Connected",
+                                style: TextStyle(
+                                  color: _isConnected ? Colors.green : Colors.white.withOpacity(0.5),
+                                  fontSize: 12,
+                                ),
+                              ),
                       ],
                     ),
                     const Spacer(),
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.3),
-                        shape: BoxShape.circle,
+                    if (!_isLoading)
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: _isConnected ? Colors.green : Colors.white.withOpacity(0.3),
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),

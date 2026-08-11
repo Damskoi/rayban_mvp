@@ -36,6 +36,8 @@ import MWDATCamera
         self?.startStream(result: result)
       } else if call.method == "takePhoto" {
         self?.takePhoto(result: result)
+      } else if call.method == "checkConnection" {
+        self?.checkConnection(result: result)
       } else {
         result(FlutterMethodNotImplemented)
       }
@@ -108,6 +110,30 @@ import MWDATCamera
         self.session = try wearables.createSession(deviceSelector: deviceSelector)
         try self.session?.start()
 
+        print("Waiting for session to start...")
+        let sessionStarted = await withTaskGroup(of: Bool.self) { group in
+            group.addTask {
+                guard let stream = self.session?.stateStream() else { return false }
+                for await state in stream {
+                    if state == .started { return true }
+                    if state == .idle || state == .stopping { return false }
+                }
+                return false
+            }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: 15_000_000_000) // 15s timeout
+                return false
+            }
+            let res = await group.next() ?? false
+            group.cancelAll()
+            return res
+        }
+
+        if !sessionStarted {
+           result(FlutterError(code: "SESSION_TIMEOUT", message: "La session n'a pas pu démarrer", details: nil))
+           return
+        }
+
         let config = StreamConfiguration(
           videoCodec: VideoCodec.raw,
           resolution: StreamingResolution.low,
@@ -141,6 +167,33 @@ import MWDATCamera
        result(true)
     } else {
        result(FlutterError(code: "NO_STREAM", message: "Flux non démarré", details: nil))
+    }
+  }
+
+  private func checkConnection(result: @escaping FlutterResult) {
+    Task {
+      let wearables = Wearables.shared
+      if wearables.registrationState != .registered {
+          result(false)
+          return
+      }
+      let deviceSelector = AutoDeviceSelector(wearables: wearables)
+      let connected = await withTaskGroup(of: Bool.self) { group in
+          group.addTask {
+              for await device in deviceSelector.activeDeviceStream() {
+                  if device != nil { return true }
+              }
+              return false
+          }
+          group.addTask {
+              try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5s timeout
+              return false
+          }
+          let res = await group.next() ?? false
+          group.cancelAll()
+          return res
+      }
+      result(connected)
     }
   }
 
