@@ -14,12 +14,7 @@ workflows:
         script: |
           set -e
           
-          # 1. Force l'installation des dépendances natives (Meta SDK)
-          cd ios
-          pod install --repo-update
-          cd ..
-          
-          # 2. Compilation de l'application sans signature
+          # 1. Compilation de l'application (lance pod install automatiquement au bon moment)
           flutter build ios --release --no-codesign
           
           # 3. Récupération du build final officiel

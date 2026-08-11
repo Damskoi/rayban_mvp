@@ -25,6 +25,16 @@
 		<string>AR|2320916045404131|59fdcf80e5603d9294aa3584c98e32ad</string>
 		<key>TeamID</key>
 		<string>$(DEVELOPMENT_TEAM)</string>
+		<key>Analytics</key>
+		<dict>
+			<key>OptOut</key>
+			<true/>
+		</dict>
+		<key>CrashReporting</key>
+		<dict>
+			<key>OptOut</key>
+			<true/>
+		</dict>
 	</dict>
 	<key>UIBackgroundModes</key>
 	<array>
