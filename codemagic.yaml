@@ -1,0 +1,18 @@
+workflows:
+  ios-build:
+    name: iOS MVP Build
+    instance_type: mac_mini_m2
+    environment:
+      flutter: default
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Get Flutter Packages
+        script: |
+          flutter packages pub get
+      - name: Build iOS IPA (Unsigned)
+        script: |
+          # Compilation de l'application sans signature pour tester via Sideloadly
+          flutter build ipa --release --no-codesign
+    artifacts:
+      - build/ios/ipa/*.ipa
