@@ -12,6 +12,8 @@ workflows:
           flutter packages pub get
       - name: Build iOS IPA (Unsigned)
         script: |
+          set -e
+          
           # 1. Force l'installation des dépendances natives (Meta SDK)
           cd ios
           pod install --repo-update
@@ -20,18 +22,24 @@ workflows:
           # 2. Compilation de l'application sans signature
           flutter build ios --release --no-codesign
           
-          # 3. Recherche automatique du dossier .app généré
-          APP_PATH=$(find build/ios -name "Runner.app" | head -n 1)
-          if [ -z "$APP_PATH" ]; then
-            echo "Erreur: Runner.app introuvable !"
+          # 3. Récupération du build final officiel
+          APP_PATH="build/ios/iphoneos/Runner.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Erreur: Le build n'a pas produit de Runner.app dans $APP_PATH"
             exit 1
           fi
           
-          # 4. Création manuelle de l'IPA à la racine du projet
-          echo "Application trouvée : $APP_PATH"
+          # Affichage de la taille pour vérification dans les logs
+          echo "Taille de l'application générée :"
+          du -sh "$APP_PATH"
+          
+          # 4. Création propre de l'IPA
+          rm -rf Payload
           mkdir -p Payload
-          cp -r "$APP_PATH" Payload/
+          cp -R "$APP_PATH" Payload/
           zip -qr rayban_mvp_unsigned.ipa Payload
-          echo "IPA généré avec succès !"
+          
+          echo "Taille de l'IPA final :"
+          ls -lh rayban_mvp_unsigned.ipa
     artifacts:
-      - "*.ipa"
+      - "rayban_mvp_unsigned.ipa"
